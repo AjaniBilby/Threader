@@ -1,0 +1,14 @@
+{
+  "name": "threader",
+  "version": "1.0.0",
+  "description": "A multithreading nodejs package",
+  "main": "threader.js",
+  "scripts": {
+    "start": "node threader.js"
+  },
+  "keywords": [],
+  "dependencies": {},
+  "repository": "https://github.com/Hobgoblin101/threader/",
+  "author": "Ajani James Bilby",
+  "license": "ISC"
+}
