@@ -44,6 +44,7 @@ class Core{
       //Private com
       this.threads[i].process.stdio[3].on('data', function(chunk){
         chunk = chunk.toString();
+        console.log('Receive fd: 3 in main threader', chunk);
         var index = chunk.indexOf('\n\r');
         var event = chunk.substr(0, index);
         chunk = chunk.substr(index+2);
