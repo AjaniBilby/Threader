@@ -1,108 +1,90 @@
-var spawn = require('child_process').spawn;
 var os = require('os');
-function GetTypes(value){
-  if (typeof(value) != "object"){
-    return typeof(value);
-  }
+var spawn = require('child_process').spawn;
+var typing = require('./typing.js');
 
-  var output = {};
-
-  if ({}.toString.apply(value) === '[object Array]'){
-    output = [];
-  }
-
-  for (let key in value){
-    var type = typeof(value[key]);
-    if (type == "object"){
-      output[key] = GetTypes(value[key]);
-    }else{
-      output[key] = type;
-    }
-  }
-
-  return output;
-}
 
 
 class Core{
   constructor(){
     var core = this;
-    this.threads = [];
+    this.children = [];
+    this.callbacks = [];
     this.awaiting = [];
+    this.count = os.cpus().length;
 
-    for (let i=0; i<os.cpus().length; i++){
-      this.threads[i] = {
-        process: spawn(process.execPath, [__dirname+'/thread.js', 'child'], {
-          stdio: [null, null, null, 'pipe']
-        }),
-        callback: null
-      };
+    for (let i=0; i<this.count; i++){
+      var child = spawn(process.execPath, [__dirname+'/thread.js', 'child'], {
+        stdio: [null, null, null, 'pipe']
+      });
 
-      this.threads[i].process.stdout.pipe(process.stdout);
-      this.threads[i].process.stderr.pipe(process.stderr);
+      child.stdout.pipe(process.stdout);
+      child.stderr.pipe(process.stderr);
+      child.stdio[3].on('data', function(data){
+        data = data.toString();
 
-      //Private com
-      this.threads[i].process.stdio[3].on('data', function(chunk){
-        chunk = chunk.toString();
-        console.log('Receive fd: 3 in main threader', chunk);
-        var index = chunk.indexOf('\n\r');
-        var event = chunk.substr(0, index);
-        chunk = chunk.substr(index+2);
+        if (data.indexOf('Response') === 0){
+          if (typeof(core.callbacks[i]) == "function"){
+            core.callbacks[i](typing.STF(JSON.parse(data.substr(8))).value);
+            core.callbacks[i] = null;
+          }
 
-        switch (event) {
-          case 'Task Finish':
-            this.threads[i].callback();
-            this.threads[i].callback = null;
-            core.onTaskEnd(i);
-            break;
+          core.onTaskFinish();
+        }else{
+          console.log(data);
         }
       });
+
+      this.children[i] = child;
+      this.callbacks[i] = null;
     }
   }
 }
+Core.prototype.onTaskFinish = function(){
+  if (this.awaiting.length > 0){
+    this.dispatch(this.awaiting[0].task, this.awaiting[0].callback, this.awaiting[0].values);
+    this.awaiting.splice(0, 1);
+  }
+};
 Core.prototype.task = function(task, callback){
   var core = this;
 
-  if (typeof(callback) != "function"){
-    callback = function(){};
-  }
-
   return function(){
-    core.dispatch(task, callback, arguments);
+    core.dispatch(task, callback, Array.from(arguments));
   };
 };
-Core.prototype.dispatch = function(task, callback, inputs){
-  var thread = this.pickThread();
-  if (thread === null){
-    awaiting.push({task: task, callback: callback, inputs: inputs});
-    return;
-  }
-
-  var data = {
-    task: task.toString(),
-    callback: callback,
-    inputs: {
-      values: JSON.stringify(inputs),
-      types: JSON.stringify(GetTypes(inputs))
-    }
-  };
-
-  this.threads[thread].process.stdio[3].write('New Task\r\n'+new Buffer(JSON.stringify(data)));
-};
-Core.prototype.pickThread = function(){
-  for (let i=0; i<this.threads.length; i++){
-    if (this.threads.callback !== null){
+Core.prototype.pick = function(){
+  for (let i=0; i<this.callbacks.length; i++){
+    if (typeof(this.callbacks[i]) != "function"){
       return i;
     }
   }
 
   return null;
 };
-Core.prototype.onTaskEnd = function(thread){
-  if (awaiting.length > 0){
-    this.dispatch(awaiting[0].task, awaiting[0].callback, awaiting[0].inputs);
-    this.awaiting.splice(0, 1);
+Core.prototype.dispatch = function(task, callback, values){
+  var thread = this.pick();
+
+  if (thread === null){
+    this.awaiting.push({
+      task: task,
+      callback: callback,
+      values: values
+    });
+    return;
   }
+
+  if (typeof(values) != "object"){
+    values = [];
+  }
+
+  var send = {
+    task: task.toString(),
+    inputs: typing.FTS(values)
+  };
+
+  this.callbacks[thread] = callback;
+
+  this.children[thread].stdio[3].write('Task'+JSON.stringify(send));
 };
 
 
