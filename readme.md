@@ -1,17 +1,25 @@
 # Threader
 Bringing simple multithreading to NodeJS
 
+## Table of contents
+- General
+  - [Setup](#setup)
+  - [Use](#use)
+- [Stats](#stats)
+  - [Multi-threading](#multithreading)
+  - [Single-thread](#single thread)
+- [Bindings](#bindings)
+
 ## Setup
-It will automatically detect the number of cores on startup and setup based on that.
-```
-var thread = require('threader');
-```
+It will automatically detect the number of cores on startup and setup based on that.  
+``` var thread = require('threader'); ```
+
 ## Use
 ```
 //Create a task
 var task = thread.task(
   function(a, b){
-    console.log('I am running in a seperate process');
+    console.log('I am running in a separate process');
     return a+b;
   },
   function(result){
@@ -26,7 +34,7 @@ task(3, 5);
 ___
 
 
-## Stats
+# Stats
 I am using crypto's pbkdf2 because it is an easy to access big calculation, I know that there is an async version.
 
 ### Multithreading
@@ -41,23 +49,20 @@ var task = thread.task(
     return i;
   },
   function(i){
-    endA = Date.now();
-    if (i > possition){
-      possition = i;
+    position = i;
+    if (1000 <= position){
+      endA = Date.now();
+      console.log(endA - startA, position);
     }
   }
 );
 
 var startA = Date.now();
 var endA = Date.now();
-var possition = 0;
+var position = 0;
 for (let i=0; i<1000; i++){
   task('cat', i);
 }
-
-setInterval(function () {
-  console.log(endA - startA, possition);
-}, 1000);
 ```
 20562ms to complete
 
@@ -75,4 +80,19 @@ var endA = Date.now();
 console.log('time', endA-startA);
 ```
 
-72828mc to complete
+72828ms to complete
+
+
+___
+
+## Bindings
+
+### task(task[function], callback[function], isAsync[boolean])
+If async is true, then the callback will not be triggered until ```end(result[variable])``` is called.
+This function returns a dispatch function
+
+### dispatch()
+This will parse your arguments to the predefined task.
+
+### memoryShare()
+Coming Soon
